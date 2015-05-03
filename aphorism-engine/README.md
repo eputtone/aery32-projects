@@ -1,5 +1,8 @@
-## Installation
+## Aphorism Engine
 
+Display unending stream of aphorisms with your aery32 and display cloud.
+
+<img src="https://github.com/eputtone/aery32-projects/blob/master/aphorism-engine/pictures/aphorism_engine.jpg"/>
 
 ## display cloud License
 
