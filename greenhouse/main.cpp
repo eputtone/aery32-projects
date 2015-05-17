@@ -8,7 +8,7 @@
 using namespace aery;
 
 #define HISTORY_SIZE 220
-#define TICKS_PER_HOUR 2
+#define TICKS_PER_HOUR 60
 
 const char* REFRESH_BUTTON_TEXT = "REFRESH";
 const char* PUMP_BUTTON_TEXT = "PUMP";
@@ -25,7 +25,7 @@ const char* TEMPERATURE_LOW_TEXT = "0C";
 const char* HUMIDITY_HIGH_TEXT = "90P";
 const char* HUMIDITY_LOW_TEXT = "20P";
 
-const uint32_t TICK = 5*115000/2;
+const uint32_t TICK = 60*115000/2;
 
 int temperatureHistory[HISTORY_SIZE];
 int humidityHistory[HISTORY_SIZE];
@@ -35,23 +35,39 @@ uint32_t current_tick = 0;
 uint32_t next_pump_ticks_left = ticks_between_pumps;
 uint32_t empty_tank_since_ticks = 0;
 
+void draw_pump_button(bool is_pumping)
+{
+	if (is_pumping)
+	{
+		display::fill_rectangle(10, 177, 150, 45, BLACK);
+		display::print_text(40, 190, WHITE, 3, PUMP_BUTTON_TEXT);
+	}
+	else
+	{
+		display::fill_rectangle(10, 177, 150, 45, WHITE);
+		display::draw_rectangle(10, 177, 150, 45, BLACK);
+		display::print_text(40, 190, BLACK, 3, PUMP_BUTTON_TEXT);
+	}
+}
+
 void draw_background() 
 {
 	char str[20] = "";
 	char tmp[10] = "";
+
 	display::fill_rectangle(0, 0, 400, 240, WHITE);
 
 	// draw actions buttons
 	display::draw_rectangle(10, 127, 150, 45, BLACK);
 	display::print_text(20, 140, BLACK, 3, REFRESH_BUTTON_TEXT);
 
-	display::draw_rectangle(10, 177, 150, 45, BLACK);
-	display::print_text(40, 190, BLACK, 3, PUMP_BUTTON_TEXT);
+	draw_pump_button(false);
 
 	strcat(str, NEXT_BUMP_TEXT);
 	dtoa(((double)next_pump_ticks_left)/TICKS_PER_HOUR, 2, tmp);
 	strcat(str, tmp);
 	strcat(str, HOUR_TEXT);
+
 	display::print_text(170, 140, BLACK, 2, str);
 	display::draw_rectangle(355, 125, 35, 35, BLACK);
 	display::print_text(365, 135, BLACK, 3, PLUS_TEXT);
@@ -90,15 +106,17 @@ void pump_water()
 {
 	if (!gpio_read_pin(WATER_FLOAT))
 	{
+		draw_pump_button(true);
 		gpio_set_pin_high(PUMP);
 		delay_ms(20000);
 		gpio_set_pin_low(PUMP);
+		draw_pump_button(false);
 	}
 }
 
 void update_dht11_values(void)
 {
-	char tmp[10];
+	char tmp[10] = "";
 	display::fill_rectangle(270, 0, 129, 120, WHITE);
 	dht::read11(DHT11);
 
@@ -109,7 +127,7 @@ void update_dht11_values(void)
 	display::print_text(280, 80, BLACK, 3, strcat(tmp, PERCENTAGE_TEXT));
 }
 
-void update_water_float_status(void)
+bool update_water_float_status(void)
 {
 	char str[20] = "";
 	char tmp[10] = "";
@@ -122,11 +140,13 @@ void update_water_float_status(void)
 		strcat(str, tmp);
 		strcat(str, HOUR_TEXT);
 		display::print_text(170, 205, BLACK, 2, str);
+		return false;
 	}
 	else
 	{
 		empty_tank_since_ticks = 0;
-		display::print_text(170, 205, BLACK, 2, FULL_TANK_TEXT);		
+		display::print_text(170, 205, BLACK, 2, FULL_TANK_TEXT);
+		return true;
 	}
 }
 
@@ -141,7 +161,7 @@ void isrhandler_rtc(void)
 {	
 	draw_background();
 	update_dht11_values();
-	update_water_float_status();
+	bool has_water = update_water_float_status();
 	current_tick++;
 	if (current_tick % TICKS_PER_HOUR == 0)
 	{
@@ -155,6 +175,10 @@ void isrhandler_rtc(void)
 	else
 	{
 		next_pump_ticks_left--;
+	}
+	if (!has_water)
+	{
+		empty_tank_since_ticks++;
 	}
 	//rtc_clear_interrupt();
 	//rtc_set_value(0);
@@ -194,9 +218,6 @@ int main(void)
 	display::touch_init();
 
 	rtc_init(RTC_SOURCE_RC, 0, 0, TICK);
-	//intc_init();
-	//intc_register_isrhandler(&isrhandler_rtc, 1, 0);
-	//intc_enable_globally();
 	rtc_enable(false);
 
 	isrhandler_rtc();
@@ -204,7 +225,6 @@ int main(void)
 	for(;;) 
 	{
 		display::touch_enable();
-		//display::touch_wait_for_data();
 		while (true)
 		{
 			if (AVR32_RTC.val == TICK)
