@@ -9,7 +9,7 @@ void board::init(void)
 	gpio_init_pins(portb, 0xffffffff, GPIO_INPUT);
 	gpio_init_pins(portc, 0x0000003f, GPIO_INPUT);
 
-	gpio_init_pin(PUMP, GPIO_OUTPUT);
+	gpio_init_pin(PUMP, GPIO_OUTPUT|GPIO_LOW);
     gpio_init_pin(DHT11, GPIO_OUTPUT|GPIO_HIGH);
     gpio_init_pin(WATER_FLOAT, GPIO_INPUT|GPIO_PULLUP);
 
